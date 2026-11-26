@@ -31,6 +31,31 @@ bp_setup_python() {
   fi
 
   "$UV_BIN" venv --seed --python "$py" "$VENV_DIR"
+
+  # ctypes.util.find_library only consults the ldconfig cache / gcc / ld, so it
+  # never sees libraries extracted into .apt (exposed via LD_LIBRARY_PATH by
+  # .profile.d/000_apt.sh). That breaks e.g. the Discord voice codec probe
+  # (plugins/platforms/discord/adapter_opus.py uses find_library("opus") and
+  # would report "Opus codec not found"). Patch find_library in the venv to
+  # also scan LD_LIBRARY_PATH.
+  local site_packages
+  site_packages="$(ls -d "${VENV_DIR}"/lib/python*/site-packages | head -n 1)"
+  cat > "${site_packages}/zz_bp_findlib_ldpath.pth" <<'EOF'
+import ctypes.util, glob, os
+_orig_find_library = ctypes.util.find_library
+def _bp_find_library(name):
+    lib = _orig_find_library(name)
+    if lib:
+        return lib
+    for d in os.environ.get("LD_LIBRARY_PATH", "").split(os.pathsep):
+        if not d:
+            continue
+        for pat in ("lib%s.so*" % name, "%s.so*" % name):
+            for cand in sorted(glob.glob(os.path.join(d, pat))):
+                return cand
+    return None
+ctypes.util.find_library = _bp_find_library
+EOF
 }
 
 # bp_install_hermes — installs hermes-agent's locked dependencies from the pinned
