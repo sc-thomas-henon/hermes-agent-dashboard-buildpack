@@ -23,6 +23,7 @@ bp_install_system_packages "$BUILD_DIR"
 bp_setup_python "$BUILD_DIR"
 bp_install_hermes
 bp_install_app_requirements "$BUILD_DIR"
+bp_write_hermes_config "$BUILD_DIR"
 bp_build_web_dist
 
 status "Writing .profile.d/hermes.sh"
@@ -40,17 +41,21 @@ export API_SERVER_PORT="${API_SERVER_PORT:-${PORT:-8642}}"
 # `hermes dashboard` skips its runtime web build (which would fail on the
 # read-only image layer, EXDEV) and serves this dist after checking index.html.
 export HERMES_WEB_DIST="/app/hermes-src/hermes_cli/web_dist"
-# Bridge *_API_KEY app env vars into $HERMES_HOME/.env (0600) at boot: the
+# Bridge credential app env vars into $HERMES_HOME/.env (0600) at boot: the
 # gateway/dashboard resolve provider credentials through the profile secret
 # scope (<home>/.env), and under multiplexing a scope miss never falls back to
 # os.environ — so a key set only as an app env var would stay invisible to
-# the model runtime. This keeps the "configure via env vars only" model.
+# the model runtime. Covers *_API_KEY, *_BOT_TOKEN and VOICE_TOOLS_OPENAI_KEY.
+# This keeps the "configure via env vars only" model.
 if [ -n "${HERMES_HOME:-}" ]; then
   _old_umask="$(umask)"
   umask 077
   mkdir -p "$HERMES_HOME"
   touch "$HERMES_HOME/.env"
-  for _key in $(env | sed -n 's/^\([A-Za-z_][A-Za-z0-9_]*_API_KEY\)=.*/\1/p' | sort -u); do
+  for _key in $(env | sed -n \
+      -e 's/^\([A-Za-z_][A-Za-z0-9_]*_API_KEY\)=.*/\1/p' \
+      -e 's/^\([A-Za-z_][A-Za-z0-9_]*_BOT_TOKEN\)=.*/\1/p' \
+      -e 's/^\(VOICE_TOOLS_OPENAI_KEY\)=.*/\1/p' | sort -u); do
     _val="${!_key:-}"
     [ -n "$_val" ] || continue
     grep -v "^${_key}=" "$HERMES_HOME/.env" > "$HERMES_HOME/.env.bridge" 2>/dev/null || true

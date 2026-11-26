@@ -59,8 +59,16 @@ bp_install_hermes() {
   rm -rf "${BUILD_DIR}/hermes-src"
   cp -a "$src_cache" "${BUILD_DIR}/hermes-src"
   rm -rf "${BUILD_DIR}/hermes-src/.git"
+  local extra_args=()
+  local extra
+  for extra in $(bp_env HERMES_UV_EXTRAS ""); do
+    extra_args+=(--extra "$extra")
+  done
+  if [ ${#extra_args[@]} -gt 0 ]; then
+    status "uv extras from HERMES_UV_EXTRAS: $(bp_env HERMES_UV_EXTRAS "")"
+  fi
   status "Installing hermes-agent ${HERMES_AGENT_VERSION} dependencies (uv.lock, frozen)"
-  (cd "${BUILD_DIR}/hermes-src" && UV_PROJECT_ENVIRONMENT="${VENV_DIR}" "$UV_BIN" sync --frozen --no-install-project --python "${VENV_DIR}/bin/python")
+  (cd "${BUILD_DIR}/hermes-src" && UV_PROJECT_ENVIRONMENT="${VENV_DIR}" "$UV_BIN" sync --frozen --no-install-project "${extra_args[@]}" --python "${VENV_DIR}/bin/python")
 
   if [ -n "${HERMES_EXTRA_PACKAGES}" ]; then
     status "Installing extra packages: ${HERMES_EXTRA_PACKAGES}"
@@ -82,6 +90,46 @@ EOF
 exec /app/.venv/bin/python -m acp_adapter.entry "$@"
 EOF
   chmod +x "${BUILD_DIR}/bin/hermes" "${BUILD_DIR}/bin/hermes-agent" "${BUILD_DIR}/bin/hermes-acp"
+}
+
+# bp_write_hermes_config BUILD_DIR — bakes /app/.hermes/config.yaml at compile
+# time from app env vars (exposed in ENV_DIR during the build). The container fs
+# is ephemeral on Scalingo, so a config.yaml written at runtime would be lost on
+# restart; and stt/tts/voice provider selection only exists as config.yaml keys
+# (there is no env mapping for stt.provider/tts.provider), so we generate it at
+# build time. Keys that DO have env mappings (API keys, HERMES_MODEL, …) still
+# win at runtime via the environment / the .env bridge in .profile.d/hermes.sh.
+bp_write_hermes_config() {
+  local build_dir="$1"
+  local stt_provider stt_language tts_provider tts_voice voice_auto_tts voice_auto_tts_mode
+  stt_provider="$(bp_env HERMES_STT_PROVIDER "")"
+  stt_language="$(bp_env HERMES_STT_LANGUAGE "")"
+  tts_provider="$(bp_env HERMES_TTS_PROVIDER "")"
+  tts_voice="$(bp_env HERMES_TTS_VOICE "")"
+  voice_auto_tts="$(bp_env HERMES_VOICE_AUTO_TTS "")"
+  voice_auto_tts_mode="$(bp_env HERMES_VOICE_AUTO_TTS_MODE "")"
+  if [ -z "${stt_provider}${stt_language}${tts_provider}${tts_voice}${voice_auto_tts}${voice_auto_tts_mode}" ]; then
+    return 0
+  fi
+  status "Writing .hermes/config.yaml from HERMES_STT_*/HERMES_TTS_*/HERMES_VOICE_* env vars"
+  mkdir -p "${build_dir}/.hermes"
+  {
+    if [ -n "$stt_provider" ] || [ -n "$stt_language" ]; then
+      echo "stt:"
+      if [ -n "$stt_provider" ]; then printf '  provider: %s\n' "$stt_provider"; fi
+      if [ -n "$stt_language" ]; then printf '  language: %s\n' "$stt_language"; fi
+    fi
+    if [ -n "$tts_provider" ] || [ -n "$tts_voice" ]; then
+      echo "tts:"
+      if [ -n "$tts_provider" ]; then printf '  provider: %s\n' "$tts_provider"; fi
+      if [ -n "$tts_voice" ]; then printf '  edge:\n    voice: %s\n' "$tts_voice"; fi
+    fi
+    if [ -n "$voice_auto_tts" ] || [ -n "$voice_auto_tts_mode" ]; then
+      echo "voice:"
+      if [ -n "$voice_auto_tts" ]; then printf '  auto_tts: %s\n' "$voice_auto_tts"; fi
+      if [ -n "$voice_auto_tts_mode" ]; then printf '  auto_tts_mode: %s\n' "$voice_auto_tts_mode"; fi
+    fi
+  } > "${build_dir}/.hermes/config.yaml"
 }
 
 # bp_install_app_requirements BUILD_DIR — installs the app's requirements.txt

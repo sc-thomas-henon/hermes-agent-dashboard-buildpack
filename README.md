@@ -104,6 +104,14 @@ Provide your own `Procfile` in the app to override it.
 | `HERMES_AGENT_VERSION` | `v0.23.4` (see `conf/versions.sh`) | Git tag of NousResearch/hermes-agent to install |
 | `APT_FILE_MANIFEST` | `<app>/Aptfile` | Extra apt packages file |
 | `BUILDPACK_DEBUG` | unset | Set to any value for `set -x` in compile |
+| `HERMES_UV_EXTRAS` | unset | uv extras from upstream's `uv.lock` at compile time (e.g. `messaging edge-tts` for bots + voice) |
+| `HERMES_STT_PROVIDER` / `HERMES_STT_LANGUAGE` | unset | Baked into `/app/.hermes/config.yaml` as `stt.provider` / `stt.language` |
+| `HERMES_TTS_PROVIDER` / `HERMES_TTS_VOICE` | unset | Baked as `tts.provider` / `tts.edge.voice` |
+| `HERMES_VOICE_AUTO_TTS` / `HERMES_VOICE_AUTO_TTS_MODE` | unset | Baked as `voice.auto_tts` / `voice.auto_tts_mode` |
+
+These `HERMES_*` vars are compile-time only (baked `config.yaml`, ephemeral fs);
+credentials (`*_API_KEY`, `*_BOT_TOKEN`, `VOICE_TOOLS_OPENAI_KEY`) stay env-only
+and are bridged into `$HERMES_HOME/.env` (0600) at container boot.
 
 Note: the Hermes source checkout (~330 MB) is shipped inside the app
 (`/app/hermes-src`) because upstream does not publish installable wheels.

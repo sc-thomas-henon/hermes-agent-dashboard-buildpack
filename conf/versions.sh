@@ -5,7 +5,8 @@ UV_VERSION="0.13.10"
 # Downloaded and extracted into .apt (see lib/apt.sh); python3.14 comes from the
 # scalingo-26 base image, git/curl are already in the stack image. libatomic1 is
 # linked by the standalone Node >= 25 binary (libatomic.so.1) during the web build.
-APT_PACKAGES="ripgrep ffmpeg libatomic1"
+# libopus0 is the Discord voice codec (loaded from .apt via LD_LIBRARY_PATH).
+APT_PACKAGES="ripgrep ffmpeg libatomic1 libopus0"
 # The gateway's HTTP platforms (api_server, webhooks) need aiohttp, which upstream
 # only ships in opt-in extras (messaging/slack/matrix) — pin the same version.
 HERMES_EXTRA_PACKAGES="aiohttp==3.14.5"
@@ -20,3 +21,6 @@ HERMES_EXTRA_PACKAGES="aiohttp==3.14.5"
 NODE_VERSION="v26.12.1"
 # pnpm version pinned by hermes-agent (pm/lock.json), enforced by its preinstall.
 PNPM_VERSION="12.15.0"
+# Optional uv extras installed from the pinned tag's uv.lock, selected at compile
+# time via the app env var HERMES_UV_EXTRAS (e.g. "messaging edge-tts").
+# Read from ENV_DIR in lib/python.sh (bp_env).
