@@ -33,5 +33,9 @@ bp_build_web_dist() {
   )
   [ -f "${BUILD_DIR}/hermes-src/hermes_cli/web_dist/index.html" ] \
     || error "web dashboard build did not produce hermes_cli/web_dist/index.html"
+  # The dashboard serves the prebuilt dist at runtime (HERMES_WEB_DIST, see
+  # bin/compile) and never runs node there, so the workspace node_modules are
+  # dead weight in the image (they were ~1.5 GB with electron et al).
+  find "${BUILD_DIR}/hermes-src" -type d -name node_modules -prune -exec rm -rf '{}' +
   status "Web dashboard built"
 }

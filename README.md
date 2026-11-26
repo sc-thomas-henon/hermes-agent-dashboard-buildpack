@@ -78,6 +78,12 @@ The buildpack applies when the application root contains:
 web: hermes dashboard --host 0.0.0.0 --port $PORT
 ```
 
+`.profile.d/hermes.sh` also exports `HERMES_WEB_DIST=/app/hermes-src/hermes_cli/web_dist`:
+with it set, `hermes dashboard` serves the prebuilt dist instead of rebuilding at
+boot (a runtime rebuild cannot replace the dist directory on the read-only image
+layer — EXDEV — and would need Node at runtime). The web build runs with the same
+Node version PM pins in `pm/lock.json`, so the build receipt stays valid.
+
 The dashboard is fail-closed: set `HERMES_DASHBOARD_BASIC_AUTH_USERNAME`,
 `HERMES_DASHBOARD_BASIC_AUTH_PASSWORD` and `HERMES_DASHBOARD_BASIC_AUTH_SECRET`
 as app env vars or it refuses to start. Do NOT set `API_SERVER_KEY` on this app

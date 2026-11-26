@@ -11,10 +11,12 @@ APT_PACKAGES="ripgrep ffmpeg libatomic1"
 HERMES_EXTRA_PACKAGES="aiohttp==3.14.5"
 # Standalone Node.js (official nodejs.org linux tarball, see lib/web.sh), used
 # only at build time to compile the web dashboard. hermes-agent requires
-# node >= 26 (engines in its package.json, engineStrict in pnpm-workspace.yaml).
+# node >= 26 (engines in its package.json, engineStrict in pnpm-workspace.yaml);
+# we pin the exact version PM downloads at runtime (pm/lock.json) so the build
+# receipt (hermes-build.json records process.versions.node) still validates.
 # The apt nodejs deb cannot be used from .apt: Debian's build externalizes
 # builtins to /usr/share/nodejs, which does not exist at runtime, so node
 # core-dumps when running npm.
-NODE_VERSION="v26.13.1"
+NODE_VERSION="v26.12.1"
 # pnpm version pinned by hermes-agent (pm/lock.json), enforced by its preinstall.
 PNPM_VERSION="12.15.0"

@@ -36,6 +36,10 @@ export HERMES_HOME="${HERMES_HOME:-/app/.hermes}"
 # the gateway's api_server platform (see gateway/config_env.py in hermes-agent).
 export API_SERVER_HOST="${API_SERVER_HOST:-0.0.0.0}"
 export API_SERVER_PORT="${API_SERVER_PORT:-${PORT:-8642}}"
+# Prebuilt web dashboard (built at compile time): with HERMES_WEB_DIST set,
+# `hermes dashboard` skips its runtime web build (which would fail on the
+# read-only image layer, EXDEV) and serves this dist after checking index.html.
+export HERMES_WEB_DIST="/app/hermes-src/hermes_cli/web_dist"
 EOF
 
 status "Done"
