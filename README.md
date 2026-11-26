@@ -1,8 +1,11 @@
 # Hermes Agent Dashboard Buildpack for Scalingo
 
-Variant of the Hermes Agent buildpack that deploys the **Hermes web dashboard**
-(`hermes dashboard`) instead of the bare gateway. The agent/gateway variant
-lives on branch `vibe/hermes-buildpack-4c9b18`.
+Buildpack that deploys the **Hermes web dashboard** (`hermes dashboard`) on
+Scalingo. The agent/gateway variant lives in
+[hermes-agent-buildpack](https://github.com/sc-thomas-henon/hermes-agent-buildpack).
+
+Note: this repository must be **public** — the Scalingo builder clones
+`BUILDPACK_URL` over HTTPS without credentials.
 
 Custom [Scalingo](https://scalingo.com) buildpack that deploys
 [Hermes Agent](https://github.com/NousResearch/hermes-agent) (Nous Research)
