@@ -36,18 +36,13 @@ bp_setup_python() {
   # never sees libraries extracted into .apt (exposed via LD_LIBRARY_PATH by
   # .profile.d/000_apt.sh). That breaks e.g. the Discord voice codec probe
   # (plugins/platforms/discord/adapter_opus.py uses find_library("opus") and
-  # would report "Opus codec not found"). Patch find_library from a
-  # sitecustomize module (imported at interpreter startup) to also scan
-  # LD_LIBRARY_PATH. A multi-line .pth is NOT reliable here: site execs each
-  # .pth line in a fresh namespace on 3.14, so only single-line imports apply.
+  # would report "Opus codec not found"). Patch find_library to also scan
+  # LD_LIBRARY_PATH, via a real module imported by a SINGLE-LINE .pth (multi-line
+  # .pth files are not applied on Python 3.14, and a venv sitecustomize.py is
+  # shadowed by Debian's /usr/lib/python3.14/sitecustomize.py).
   local site_packages
   site_packages="$(ls -d "${VENV_DIR}"/lib/python*/site-packages | head -n 1)"
-  local sc="${site_packages}/sitecustomize.py"
-  if [ ! -f "$sc" ] || ! grep -q "bp_find_library" "$sc"; then
-    cat >> "$sc" <<'EOF'
-# bp: ctypes.util.find_library does not consult LD_LIBRARY_PATH (only
-# ldconfig/gcc/ld), so libraries in .apt are invisible (e.g. find_library
-# ("opus") for Discord voice). Fall back to scanning LD_LIBRARY_PATH.
+  cat > "${site_packages}/bp_findlib_patch.py" <<'EOF'
 import ctypes.util as _ctu
 import glob as _glob
 import os as _os
@@ -68,7 +63,7 @@ def _bp_find_library(name):
 
 _ctu.find_library = _bp_find_library
 EOF
-  fi
+  printf 'import bp_findlib_patch\n' > "${site_packages}/zz_bp_findlib.pth"
 }
 
 # bp_install_hermes — installs hermes-agent's locked dependencies from the pinned
