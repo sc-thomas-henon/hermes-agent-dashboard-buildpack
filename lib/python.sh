@@ -36,26 +36,39 @@ bp_setup_python() {
   # never sees libraries extracted into .apt (exposed via LD_LIBRARY_PATH by
   # .profile.d/000_apt.sh). That breaks e.g. the Discord voice codec probe
   # (plugins/platforms/discord/adapter_opus.py uses find_library("opus") and
-  # would report "Opus codec not found"). Patch find_library in the venv to
-  # also scan LD_LIBRARY_PATH.
+  # would report "Opus codec not found"). Patch find_library from a
+  # sitecustomize module (imported at interpreter startup) to also scan
+  # LD_LIBRARY_PATH. A multi-line .pth is NOT reliable here: site execs each
+  # .pth line in a fresh namespace on 3.14, so only single-line imports apply.
   local site_packages
   site_packages="$(ls -d "${VENV_DIR}"/lib/python*/site-packages | head -n 1)"
-  cat > "${site_packages}/zz_bp_findlib_ldpath.pth" <<'EOF'
-import ctypes.util, glob, os
-_orig_find_library = ctypes.util.find_library
+  local sc="${site_packages}/sitecustomize.py"
+  if [ ! -f "$sc" ] || ! grep -q "bp_find_library" "$sc"; then
+    cat >> "$sc" <<'EOF'
+# bp: ctypes.util.find_library does not consult LD_LIBRARY_PATH (only
+# ldconfig/gcc/ld), so libraries in .apt are invisible (e.g. find_library
+# ("opus") for Discord voice). Fall back to scanning LD_LIBRARY_PATH.
+import ctypes.util as _ctu
+import glob as _glob
+import os as _os
+
+_bp_orig_find_library = _ctu.find_library
+
 def _bp_find_library(name):
-    lib = _orig_find_library(name)
+    lib = _bp_orig_find_library(name)
     if lib:
         return lib
-    for d in os.environ.get("LD_LIBRARY_PATH", "").split(os.pathsep):
+    for d in _os.environ.get("LD_LIBRARY_PATH", "").split(_os.pathsep):
         if not d:
             continue
         for pat in ("lib%s.so*" % name, "%s.so*" % name):
-            for cand in sorted(glob.glob(os.path.join(d, pat))):
+            for cand in sorted(_glob.glob(_os.path.join(d, pat))):
                 return cand
     return None
-ctypes.util.find_library = _bp_find_library
+
+_ctu.find_library = _bp_find_library
 EOF
+  fi
 }
 
 # bp_install_hermes — installs hermes-agent's locked dependencies from the pinned
