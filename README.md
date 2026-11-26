@@ -40,7 +40,7 @@ The buildpack applies when the application root contains:
 
 `bin/compile`:
 
-1. Fetches system packages (`ripgrep`, `ffmpeg`, `nodejs`) the Scalingo way:
+1. Fetches system packages (`ripgrep`, `ffmpeg`) the Scalingo way:
    `bin/compile` runs as a non-root user, so instead of `apt-get install` it
    downloads the .debs with `apt-get -d` (apt state/cache redirected into the
    build cache) and extracts them with `dpkg -x` into `/app/.apt`, exposed at
@@ -60,9 +60,11 @@ The buildpack applies when the application root contains:
 4. Installs the app's `requirements.txt` if present (`hermes-agent` lines are
    filtered out — the buildpack pins that version).
 5. Builds the web dashboard SPA (`hermes_cli/web_dist`) from the source checkout
-   with the pinned pnpm + `node scripts/build/web.mjs` (node from `.apt`), since
-   the assets are not in the git checkout. Cached via the pnpm store in the build
-   cache.
+   with the pinned pnpm + `node scripts/build/web.mjs`, using a standalone Node.js
+   (`NODE_VERSION`, official nodejs.org tarball cached in the build cache — the
+   apt `nodejs` deb is unusable from `.apt` because Debian externalizes builtins to
+   `/usr/share/nodejs`), since the assets are not in the git checkout. Node deps
+   are cached via the pnpm store in the build cache.
 5. Writes `.profile.d/hermes.sh` which exports:
    - `PATH` with `/app/.venv/bin` first,
    - `HERMES_HOME` (default `/app/.hermes`),
