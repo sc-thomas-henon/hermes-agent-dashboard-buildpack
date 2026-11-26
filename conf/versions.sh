@@ -6,7 +6,9 @@ UV_VERSION="0.13.10"
 # scalingo-26 base image, git/curl are already in the stack image. libatomic1 is
 # linked by the standalone Node >= 25 binary (libatomic.so.1) during the web build.
 # libopus0 is the Discord voice codec (loaded from .apt via LD_LIBRARY_PATH).
-APT_PACKAGES="ripgrep ffmpeg libatomic1 libopus0"
+# libpulse0 ships libpulsecommon-*.so, which the apt ffmpeg binary needs at load
+# time (apt Recommends are not downloaded in the download-only .apt flow).
+APT_PACKAGES="ripgrep ffmpeg libatomic1 libopus0 libpulse0"
 # The gateway's HTTP platforms (api_server, webhooks) need aiohttp, which upstream
 # only ships in opt-in extras (messaging/slack/matrix) — pin the same version.
 HERMES_EXTRA_PACKAGES="aiohttp==3.14.5"
