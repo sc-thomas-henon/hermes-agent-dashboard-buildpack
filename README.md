@@ -61,10 +61,11 @@ The buildpack applies when the application root contains:
    filtered out — the buildpack pins that version).
 5. Builds the web dashboard SPA (`hermes_cli/web_dist`) from the source checkout
    with the pinned pnpm + `node scripts/build/web.mjs`, using a standalone Node.js
-   (`NODE_VERSION`, official nodejs.org tarball cached in the build cache — the
-   apt `nodejs` deb is unusable from `.apt` because Debian externalizes builtins to
-   `/usr/share/nodejs`), since the assets are not in the git checkout. Node deps
-   are cached via the pnpm store in the build cache.
+   >= 26 (`NODE_VERSION`, official nodejs.org tarball cached in the build cache —
+   the apt `nodejs` deb is unusable from `.apt` because Debian externalizes
+   builtins to `/usr/share/nodejs`; Node >= 25 also links `libatomic.so.1`,
+   provided by `libatomic1` in `.apt`), since the assets are not in the git
+   checkout. Node deps are cached via the pnpm store in the build cache.
 5. Writes `.profile.d/hermes.sh` which exports:
    - `PATH` with `/app/.venv/bin` first,
    - `HERMES_HOME` (default `/app/.hermes`),
