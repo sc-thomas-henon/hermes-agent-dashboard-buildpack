@@ -89,6 +89,12 @@ The dashboard is fail-closed: set `HERMES_DASHBOARD_BASIC_AUTH_USERNAME`,
 as app env vars or it refuses to start. Do NOT set `API_SERVER_KEY` on this app
 (it would enable the api_server platform on the same `$PORT`).
 
+Provider API keys set as app config vars (any `*_API_KEY`, e.g.
+`OPENROUTER_API_KEY`) are bridged at container boot into `$HERMES_HOME/.env`
+(mode 0600) by `.profile.d/hermes.sh`, because the dashboard backend resolves
+provider credentials through the profile secret scope (`<home>/.env`) and, under
+multiplexing, a scope miss never falls back to `os.environ`.
+
 Provide your own `Procfile` in the app to override it.
 
 ## Configuration variables

@@ -40,6 +40,26 @@ export API_SERVER_PORT="${API_SERVER_PORT:-${PORT:-8642}}"
 # `hermes dashboard` skips its runtime web build (which would fail on the
 # read-only image layer, EXDEV) and serves this dist after checking index.html.
 export HERMES_WEB_DIST="/app/hermes-src/hermes_cli/web_dist"
+# Bridge *_API_KEY app env vars into $HERMES_HOME/.env (0600) at boot: the
+# gateway/dashboard resolve provider credentials through the profile secret
+# scope (<home>/.env), and under multiplexing a scope miss never falls back to
+# os.environ — so a key set only as an app env var would stay invisible to
+# the model runtime. This keeps the "configure via env vars only" model.
+if [ -n "${HERMES_HOME:-}" ]; then
+  _old_umask="$(umask)"
+  umask 077
+  mkdir -p "$HERMES_HOME"
+  touch "$HERMES_HOME/.env"
+  for _key in $(env | sed -n 's/^\([A-Za-z_][A-Za-z0-9_]*_API_KEY\)=.*/\1/p' | sort -u); do
+    _val="${!_key:-}"
+    [ -n "$_val" ] || continue
+    grep -v "^${_key}=" "$HERMES_HOME/.env" > "$HERMES_HOME/.env.bridge" 2>/dev/null || true
+    printf '%s=%s\n' "$_key" "$_val" >> "$HERMES_HOME/.env.bridge"
+    mv "$HERMES_HOME/.env.bridge" "$HERMES_HOME/.env"
+  done
+  chmod 600 "$HERMES_HOME/.env"
+  umask "$_old_umask"
+fi
 EOF
 
 status "Done"
