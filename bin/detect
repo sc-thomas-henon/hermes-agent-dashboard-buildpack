@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+set -e
+
+BUILD_DIR=${1:-}
+
+for manifest in requirements.txt pyproject.toml; do
+  if [ -f "${BUILD_DIR}/${manifest}" ] && grep -qiE 'hermes[-_]agent' "${BUILD_DIR}/${manifest}"; then
+    echo "Hermes Agent (Python)"
+    exit 0
+  fi
+done
+
+if [ -f "${BUILD_DIR}/Hermesfile" ]; then
+  echo "Hermes Agent (Python)"
+  exit 0
+fi
+
+exit 1

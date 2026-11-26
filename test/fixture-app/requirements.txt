@@ -1,0 +1,1 @@
+hermes-agent @ git+https://github.com/NousResearch/hermes-agent.git@v0.23.4

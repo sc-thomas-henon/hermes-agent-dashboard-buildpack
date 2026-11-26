@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+
+BUILD_DIR=${1:-}
+
+cat << EOF
+---
+addons:
+config_vars:
+  PATH: /app/.venv/bin:/app/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+default_process_types:
+  web: hermes dashboard --host 0.0.0.0 --port \$PORT
+EOF

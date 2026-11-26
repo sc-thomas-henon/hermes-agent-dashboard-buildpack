@@ -1,0 +1,8 @@
+# Example $HERMES_HOME/config.yaml (i.e. .hermes/config.yaml in the app repo).
+# Enables the OpenAI-compatible API server of `hermes gateway run`.
+# The buildpack sets API_SERVER_HOST=0.0.0.0 and API_SERVER_PORT=$PORT.
+platforms:
+  api_server:
+    enabled: true
+    extra:
+      key: "change-me-at-least-16-chars"

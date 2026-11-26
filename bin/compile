@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+set -e
+set -o pipefail
+
+BP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+BUILD_DIR="${1:?usage: compile <build_dir> <cache_dir> <env_dir>}"
+CACHE_DIR="${2:?usage: compile <build_dir> <cache_dir> <env_dir>}"
+ENV_DIR="${3:?usage: compile <build_dir> <cache_dir> <env_dir>}"
+
+source "$BP_DIR/conf/versions.sh"
+source "$BP_DIR/lib/common.sh"
+source "$BP_DIR/lib/apt.sh"
+source "$BP_DIR/lib/python.sh"
+source "$BP_DIR/lib/web.sh"
+
+if [ -n "$(bp_env BUILDPACK_DEBUG "")" ]; then
+  set -x
+fi
+
+HERMES_AGENT_VERSION="$(bp_env HERMES_AGENT_VERSION "$HERMES_AGENT_VERSION")"
+
+bp_install_system_packages "$BUILD_DIR"
+bp_setup_python "$BUILD_DIR"
+bp_install_hermes
+bp_install_app_requirements "$BUILD_DIR"
+bp_build_web_dist
+
+status "Writing .profile.d/hermes.sh"
+mkdir -p "${BUILD_DIR}/.profile.d"
+cat > "${BUILD_DIR}/.profile.d/hermes.sh" <<'EOF'
+export PATH="/app/.venv/bin:/app/bin:$PATH"
+export PYTHONPATH="/app/hermes-src${PYTHONPATH:+:$PYTHONPATH}"
+export HERMES_HOME="${HERMES_HOME:-/app/.hermes}"
+# Scalingo-safe defaults; app config vars (env) win when set, e.g. via
+# `scalingo env-set API_SERVER_KEY=...` — setting API_SERVER_KEY also enables
+# the gateway's api_server platform (see gateway/config_env.py in hermes-agent).
+export API_SERVER_HOST="${API_SERVER_HOST:-0.0.0.0}"
+export API_SERVER_PORT="${API_SERVER_PORT:-${PORT:-8642}}"
+EOF
+
+status "Done"
