@@ -123,6 +123,14 @@ EOF
 exec /app/.venv/bin/python -m acp_adapter.entry "$@"
 EOF
   chmod +x "${BUILD_DIR}/bin/hermes" "${BUILD_DIR}/bin/hermes-agent" "${BUILD_DIR}/bin/hermes-acp"
+
+  status "Rewriting venv console-script shebangs to the runtime path"
+  local script
+  for script in "${VENV_DIR}/bin"/*; do
+    [ -f "$script" ] || continue
+    head -c 2 "$script" 2>/dev/null | grep -q '#!' || continue
+    sed -i "1s|^#!${BUILD_DIR}|#!/app|" "$script" 2>/dev/null || true
+  done
 }
 
 # bp_write_hermes_config BUILD_DIR — bakes /app/.hermes/config.yaml at compile
