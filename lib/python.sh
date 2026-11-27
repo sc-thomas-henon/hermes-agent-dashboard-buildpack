@@ -142,23 +142,29 @@ EOF
 # win at runtime via the environment / the .env bridge in .profile.d/hermes.sh.
 bp_write_hermes_config() {
   local build_dir="$1"
-  local stt_provider stt_language tts_provider tts_voice voice_auto_tts voice_auto_tts_mode
+  local stt_provider stt_language stt_model tts_provider tts_voice voice_auto_tts voice_auto_tts_mode
   stt_provider="$(bp_env HERMES_STT_PROVIDER "")"
   stt_language="$(bp_env HERMES_STT_LANGUAGE "")"
+  stt_model="$(bp_env HERMES_STT_MODEL "")"
   tts_provider="$(bp_env HERMES_TTS_PROVIDER "")"
   tts_voice="$(bp_env HERMES_TTS_VOICE "")"
   voice_auto_tts="$(bp_env HERMES_VOICE_AUTO_TTS "")"
   voice_auto_tts_mode="$(bp_env HERMES_VOICE_AUTO_TTS_MODE "")"
-  if [ -z "${stt_provider}${stt_language}${tts_provider}${tts_voice}${voice_auto_tts}${voice_auto_tts_mode}" ]; then
+  if [ -z "${stt_provider}${stt_language}${stt_model}${tts_provider}${tts_voice}${voice_auto_tts}${voice_auto_tts_mode}" ]; then
     return 0
   fi
   status "Writing .hermes/config.yaml from HERMES_STT_*/HERMES_TTS_*/HERMES_VOICE_* env vars"
   mkdir -p "${build_dir}/.hermes"
   {
-    if [ -n "$stt_provider" ] || [ -n "$stt_language" ]; then
+    if [ -n "$stt_provider" ] || [ -n "$stt_language" ] || [ -n "$stt_model" ]; then
       echo "stt:"
       if [ -n "$stt_provider" ]; then printf '  provider: %s\n' "$stt_provider"; fi
       if [ -n "$stt_language" ]; then printf '  language: %s\n' "$stt_language"; fi
+      if [ -n "$stt_model" ] && [ -n "$stt_provider" ]; then
+        local model_key="model"
+        if [ "$stt_provider" = "elevenlabs" ]; then model_key="model_id"; fi
+        printf '  %s:\n    %s: %s\n' "$stt_provider" "$model_key" "$stt_model"
+      fi
     fi
     if [ -n "$tts_provider" ] || [ -n "$tts_voice" ]; then
       echo "tts:"
