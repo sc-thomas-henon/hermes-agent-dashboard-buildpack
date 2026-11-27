@@ -50,25 +50,43 @@ bp_install_system_packages() {
   done
 
   local apt_root="${build_dir}/.apt"
+  local apt_lib_dirs=(
+    "${apt_root}/lib/x86_64-linux-gnu"
+    "${apt_root}/usr/lib/x86_64-linux-gnu"
+    "${apt_root}/lib"
+    "${apt_root}/usr/lib"
+  )
+  local so_dir
+  while IFS= read -r -d '' so_dir; do
+    apt_lib_dirs+=("$so_dir")
+  done < <(find "${apt_root}/lib" "${apt_root}/usr/lib" -mindepth 3 -name '*.so*' -printf '%h\0' 2>/dev/null | sort -uz)
+  local apt_lib_path
+  apt_lib_path="$(IFS=:; printf '%s' "${apt_lib_dirs[*]}")"
   export PATH="${apt_root}/usr/bin:${apt_root}/usr/sbin:${apt_root}/bin:${PATH}"
-  export LD_LIBRARY_PATH="${apt_root}/lib/x86_64-linux-gnu:${apt_root}/usr/lib/x86_64-linux-gnu:${apt_root}/lib:${apt_root}/usr/lib:${LD_LIBRARY_PATH}"
-  export LIBRARY_PATH="${apt_root}/lib/x86_64-linux-gnu:${apt_root}/usr/lib/x86_64-linux-gnu:${apt_root}/lib:${apt_root}/usr/lib:${LIBRARY_PATH}"
+  export LD_LIBRARY_PATH="${apt_lib_path}:${LD_LIBRARY_PATH}"
+  export LIBRARY_PATH="${apt_lib_path}:${LIBRARY_PATH}"
   export INCLUDE_PATH="${apt_root}/usr/include:${apt_root}/usr/include/x86_64-linux-gnu:${INCLUDE_PATH}"
   export CPATH="${INCLUDE_PATH}"
   export CPPPATH="${INCLUDE_PATH}"
   export PKG_CONFIG_PATH="${apt_root}/usr/lib/x86_64-linux-gnu/pkgconfig:${apt_root}/usr/lib/pkgconfig:${PKG_CONFIG_PATH}"
 
+  local profile_lib_path=""
+  local lib_dir
+  for lib_dir in "${apt_lib_dirs[@]}"; do
+    profile_lib_path="${profile_lib_path:+$profile_lib_path:}\$HOME/.apt${lib_dir#"${apt_root}"}"
+  done
+
   status "Writing .profile.d/000_apt.sh"
   mkdir -p "${build_dir}/.profile.d"
-  cat > "${build_dir}/.profile.d/000_apt.sh" <<'EOF'
-export PATH="$HOME/.apt/usr/bin:$HOME/.apt/usr/sbin:$PATH"
-export LD_LIBRARY_PATH="$HOME/.apt/lib/x86_64-linux-gnu:$HOME/.apt/usr/lib/x86_64-linux-gnu:$HOME/.apt/lib:$HOME/.apt/usr/lib:$LD_LIBRARY_PATH"
-export LIBRARY_PATH="$HOME/.apt/lib/x86_64-linux-gnu:$HOME/.apt/usr/lib/x86_64-linux-gnu:$HOME/.apt/lib:$HOME/.apt/usr/lib:$LIBRARY_PATH"
-export INCLUDE_PATH="$HOME/.apt/usr/include:$HOME/.apt/usr/include/x86_64-linux-gnu:$INCLUDE_PATH"
-export CPATH="$INCLUDE_PATH"
-export CPPPATH="$INCLUDE_PATH"
-export PKG_CONFIG_PATH="$HOME/.apt/usr/lib/x86_64-linux-gnu/pkgconfig:$HOME/.apt/usr/lib/pkgconfig:$PKG_CONFIG_PATH"
-EOF
+  {
+    echo 'export PATH="$HOME/.apt/usr/bin:$HOME/.apt/usr/sbin:$PATH"'
+    printf 'export LD_LIBRARY_PATH="%s:$LD_LIBRARY_PATH"\n' "$profile_lib_path"
+    printf 'export LIBRARY_PATH="%s:$LIBRARY_PATH"\n' "$profile_lib_path"
+    echo 'export INCLUDE_PATH="$HOME/.apt/usr/include:$HOME/.apt/usr/include/x86_64-linux-gnu:$INCLUDE_PATH"'
+    echo 'export CPATH="$INCLUDE_PATH"'
+    echo 'export CPPPATH="$INCLUDE_PATH"'
+    echo 'export PKG_CONFIG_PATH="$HOME/.apt/usr/lib/x86_64-linux-gnu/pkgconfig:$HOME/.apt/usr/lib/pkgconfig:$PKG_CONFIG_PATH"'
+  } > "${build_dir}/.profile.d/000_apt.sh"
 
   if [ -f "${apt_root}/usr/bin/git" ] && [ -d "${apt_root}/usr/lib/git-core" ]; then
     export GIT_EXEC_PATH="${apt_root}/usr/lib/git-core"
