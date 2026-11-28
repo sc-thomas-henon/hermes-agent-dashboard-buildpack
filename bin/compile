@@ -12,6 +12,7 @@ source "$BP_DIR/lib/common.sh"
 source "$BP_DIR/lib/apt.sh"
 source "$BP_DIR/lib/python.sh"
 source "$BP_DIR/lib/web.sh"
+source "$BP_DIR/lib/live-voice.sh"
 
 if [ -n "$(bp_env BUILDPACK_DEBUG "")" ]; then
   set -x
@@ -26,6 +27,12 @@ bp_install_app_requirements "$BUILD_DIR"
 bp_write_hermes_config "$BUILD_DIR"
 bp_build_web_dist
 
+if [ "$(bp_env HERMES_LIVE_VOICE "")" = "1" ]; then
+  bp_install_live_voice "$BUILD_DIR"
+else
+  status "Hermes Live Voice skipped (set HERMES_LIVE_VOICE=1 on the app to enable)"
+fi
+
 status "Writing .profile.d/hermes.sh"
 mkdir -p "${BUILD_DIR}/.profile.d"
 cat > "${BUILD_DIR}/.profile.d/hermes.sh" <<'EOF'
@@ -35,8 +42,15 @@ export HERMES_HOME="${HERMES_HOME:-/app/.hermes}"
 # Scalingo-safe defaults; app config vars (env) win when set, e.g. via
 # `scalingo env-set API_SERVER_KEY=...` — setting API_SERVER_KEY also enables
 # the gateway's api_server platform (see gateway/config_env.py in hermes-agent).
-export API_SERVER_HOST="${API_SERVER_HOST:-0.0.0.0}"
-export API_SERVER_PORT="${API_SERVER_PORT:-${PORT:-8642}}"
+if [ "${HERMES_LIVE_VOICE:-}" = "1" ] && [ -d /app/.hermes-live-voice ]; then
+  # With Live Voice enabled, the Hermes API server must not share $PORT with
+  # the dashboard: the voice gateway reaches it on a private loopback port.
+  export API_SERVER_HOST="${API_SERVER_HOST:-127.0.0.1}"
+  export API_SERVER_PORT="${API_SERVER_PORT:-8642}"
+else
+  export API_SERVER_HOST="${API_SERVER_HOST:-0.0.0.0}"
+  export API_SERVER_PORT="${API_SERVER_PORT:-${PORT:-8642}}"
+fi
 # Prebuilt web dashboard (built at compile time): with HERMES_WEB_DIST set,
 # `hermes dashboard` skips its runtime web build (which would fail on the
 # read-only image layer, EXDEV) and serves this dist after checking index.html.
@@ -64,6 +78,42 @@ if [ -n "${HERMES_HOME:-}" ]; then
   done
   chmod 600 "$HERMES_HOME/.env"
   umask "$_old_umask"
+fi
+
+# Hermes Live Voice gateway: loopback-only, respawned if it exits. The
+# dashboard plugin relays it same-origin, so the gateway needs no
+# HERMES_LIVE_AUTH_TOKEN (loopback binds are exempt). Provider selection and
+# keys (HERMES_LIVE_PROVIDER, OPENAI_API_KEY/GEMINI_API_KEY) flow from the app
+# config vars. Secrets never live in the image: they only pass through this
+# process environment at boot.
+if [ "${HERMES_LIVE_VOICE:-}" = "1" ] && [ -d /app/.hermes-live-voice ]; then
+  _hlv_home="${HERMES_HOME:-/app/.hermes}"
+  if [ -z "${API_SERVER_KEY:-}" ]; then
+    echo "hermes-live-voice: API_SERVER_KEY is not set; voice gateway not started" >&2
+  else
+    mkdir -p "${_hlv_home}/logs"
+    (
+      # The gateway reads PORT ahead of HERMES_LIVE_PORT (upstream loadConfig:
+      # `parsed.PORT ?? parsed.HERMES_LIVE_PORT`), but PORT here is Scalingo's
+      # web port, already taken by the dashboard. Drop it so the gateway uses
+      # HERMES_LIVE_PORT (8788) instead of squatting $PORT and crashing the
+      # dashboard bind (BACKEND_PORT_IN_USE).
+      unset PORT
+      while true; do
+        HERMES_BASE_URL="http://127.0.0.1:${API_SERVER_PORT:-8642}" \
+        HERMES_AGENT_API_SERVER_KEY="${API_SERVER_KEY}" \
+        HERMES_LIVE_HOST="127.0.0.1" \
+        HERMES_LIVE_PORT="${HERMES_LIVE_PORT:-8788}" \
+        HERMES_LIVE_TASK_STATE_FILE="${_hlv_home}/hermes-live/tasks-v1.json" \
+        /app/.hermes-live/node/bin/node \
+          /app/.hermes-live-voice/node_modules/hermes-live-voice/dist/cli.js serve \
+          >>"${_hlv_home}/logs/hermes-live-voice.log" 2>&1
+        echo "hermes-live-voice: gateway exited (status $?), respawning in 1s" \
+          >>"${_hlv_home}/logs/hermes-live-voice.log"
+        sleep 1
+      done
+    ) &
+  fi
 fi
 EOF
 

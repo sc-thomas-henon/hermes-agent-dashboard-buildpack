@@ -21,6 +21,10 @@ HERMES_EXTRA_PACKAGES="aiohttp==3.14.5"
 # builtins to /usr/share/nodejs, which does not exist at runtime, so node
 # core-dumps when running npm.
 NODE_VERSION="v26.12.1"
+# hermes-live-voice (npm): realtime voice gateway + dashboard plugin, opt-in
+# via HERMES_LIVE_VOICE=1 (see lib/live-voice.sh). Node >= 20 required; the
+# buildpack already ships NODE_VERSION above, so the gateway reuses it.
+HERMES_LIVE_VOICE_VERSION="1.3.0"
 # pnpm version pinned by hermes-agent (pm/lock.json), enforced by its preinstall.
 PNPM_VERSION="12.15.0"
 # Optional uv extras installed from the pinned tag's uv.lock, selected at compile
