@@ -146,6 +146,37 @@ application URL: `GET /v1/models`, `POST /v1/chat/completions`, … with
   upstream only ships in opt-in extras; the buildpack installs the pinned
   version (`HERMES_EXTRA_PACKAGES` in `conf/versions.sh`).
 
+## Hermes Live Voice (opt-in)
+
+Set `HERMES_LIVE_VOICE=1` on the app (config var) to embed
+[hermes-live-voice](https://github.com/bielcarpi/hermes-live-voice): a realtime
+voice gateway plus a "hermes-live" dashboard plugin (voice bar in Chat).
+
+What the buildpack does when the flag is set:
+
+- ships a Node.js runtime + the pinned `hermes-live-voice` npm package
+  (`HERMES_LIVE_VOICE_VERSION` in `conf/versions.sh`) in the slug,
+- installs the dashboard plugin into `.hermes/plugins/hermes-live`, enables it
+  in `.hermes/config.yaml` (`plugins.enabled`), and installs its Python
+  dependencies (`fastapi`, `httpx`, `websockets`) into the venv,
+- at boot, starts the gateway on `127.0.0.1:8788` under a respawn loop (logs:
+  `$HERMES_HOME/logs/hermes-live-voice.log`). It binds loopback, so no
+  `HERMES_LIVE_AUTH_TOKEN` is needed and it is never exposed to the network;
+  the dashboard plugin relays it same-origin.
+
+Requirements on the app config vars:
+
+- `API_SERVER_KEY` (≥ 16 chars): enables the Hermes API server the gateway
+  talks to. With Live Voice on, the API server moves to `127.0.0.1:8642`
+  (override with `API_SERVER_HOST`/`API_SERVER_PORT`) so it does not share
+  `$PORT` with the dashboard.
+- `HERMES_LIVE_PROVIDER=openai` (default) with `OPENAI_API_KEY`, or `gemini`
+  with `GEMINI_API_KEY`. Local (HuggingFace speech-to-speech) is not viable on
+  Scalingo (no Apple Silicon / 12 GB+). `mock` is available for smoke tests.
+
+Known limits (upstream behavior): voice tasks needing approval are stopped,
+never auto-approved; if Hermes restarts, in-flight voice tasks show `unknown`.
+
 ## Local testing
 
 Run the buildpack scripts in the same image Scalingo uses:
